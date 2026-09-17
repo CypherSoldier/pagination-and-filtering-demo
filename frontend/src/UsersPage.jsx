@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import "./UsersPage.css";
 
 const API_URL = "http://localhost:8000/api/users";
 
@@ -25,26 +26,26 @@ export default function UsersPage() {
         setLoading(true);
         setError("");
 
-        const params = new URLSearchParams();
+        const params = new URLSearchParams({
+          page: String(page),
+          per_page: String(pagination.per_page),
+        });
+
         if (status) params.set("status", status);
         if (role) params.set("role", role);
-        params.set("page", String(page));
-        params.set("per_page", String(pagination.per_page));
 
-        const res = await fetch(`${API_URL}?${params.toString()}`, {
+        const response = await fetch(`${API_URL}?${params}`, {
           signal: controller.signal,
         });
 
-        if (!res.ok) {
-          throw new Error("Failed to load users");
-        }
+        if (!response.ok) throw new Error("Failed to load users");
 
-        const data = await res.json();
+        const data = await response.json();
         setUsers(data.data);
         setPagination(data.pagination);
       } catch (err) {
         if (err.name !== "AbortError") {
-          setError("Failed to load users");
+          setError("Unable to load users. Please try again.");
         }
       } finally {
         setLoading(false);
@@ -52,81 +53,150 @@ export default function UsersPage() {
     }
 
     fetchUsers();
-
     return () => controller.abort();
-  }, [status, role, page]);
+  }, [status, role, page, pagination.per_page]);
 
-  function onStatusChange(e) {
-    setStatus(e.target.value);
+  function onStatusChange(event) {
+    setStatus(event.target.value);
     setPage(1);
   }
 
-  function onRoleChange(e) {
-    setRole(e.target.value);
+  function onRoleChange(event) {
+    setRole(event.target.value);
     setPage(1);
   }
 
   return (
-    <div style={{ padding: 16 }}>
-      <h1>Users</h1>
+    <main className="users-page">
+      <section className="users-container">
+        <header className="page-header">
+          <div>
+            <p className="eyebrow">Directory</p>
+            <h1>Users</h1>
+            <p className="page-description">
+              Manage and review everyone in your workspace.
+            </p>
+          </div>
 
-      <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
-        <select value={status} onChange={onStatusChange}>
-          <option value="">All statuses</option>
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
-        </select>
+          <div className="user-count">
+            <strong>{pagination.total}</strong>
+            <span>Total users</span>
+          </div>
+        </header>
 
-        <select value={role} onChange={onRoleChange}>
-          <option value="">All roles</option>
-          <option value="admin">Admin</option>
-          <option value="user">User</option>
-        </select>
-      </div>
+        <section className="filters-card" aria-label="User filters">
+          <div className="filter-heading">
+            <h2>Filter users</h2>
+            {(status || role) && (
+              <button
+                className="clear-button"
+                onClick={() => {
+                  setStatus("");
+                  setRole("");
+                  setPage(1);
+                }}
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
 
-      {loading && <p>Loading...</p>}
-      {error && <p>{error}</p>}
+          <div className="filter-controls">
+            <label>
+              Status
+              <select value={status} onChange={onStatusChange}>
+                <option value="">All statuses</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </label>
 
-      <table width="100%" cellPadding="8">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Email</th>
-            <th>Status</th>
-            <th>Role</th>
-          </tr>
-        </thead>
-        <tbody>
-          {users.map((u) => (
-            <tr key={u.user_id}>
-              <td>{u.name}</td>
-              <td>{u.email}</td>
-              <td>{u.status}</td>
-              <td>{u.role}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+            <label>
+              Role
+              <select value={role} onChange={onRoleChange}>
+                <option value="">All roles</option>
+                <option value="admin">Admin</option>
+                <option value="user">User</option>
+              </select>
+            </label>
+          </div>
+        </section>
 
-      <div style={{ display: "flex", gap: 12, marginTop: 16, alignItems: "center" }}>
-        <button
-          onClick={() => setPage((p) => Math.max(1, p - 1))}
-          disabled={page === 1 || loading}
-        >
-          Previous
-        </button>
+        <section className="table-card">
+          {loading && <div className="table-message">Loading users...</div>}
+          {error && <div className="table-message error-message">{error}</div>}
 
-        <span>
-          Page {pagination.page} of {pagination.total_pages}
-        </span>
+          {!loading && !error && users.length === 0 && (
+            <div className="table-message">No users match these filters.</div>
+          )}
 
-        <button
-          onClick={() => setPage((p) => p + 1)}
-          disabled={!pagination.has_next_page || loading}
-        >
-          Next
-        </button>
-      </div>
-    </div>
+          {!error && users.length > 0 && (
+            <div className="table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th>User</th>
+                    <th>Email</th>
+                    <th>Status</th>
+                    <th>Role</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.map((user) => (
+                    <tr key={user.user_id}>
+                      <td>
+                        <div className="user-cell">
+                          <div className="avatar">
+                            {user.name
+                              .split(" ")
+                              .map((part) => part[0])
+                              .join("")
+                              .slice(0, 2)}
+                          </div>
+                          <strong>{user.name}</strong>
+                        </div>
+                      </td>
+                      <td className="email-cell">{user.email}</td>
+                      <td>
+                        <span className={`badge ${user.status}`}>
+                          <span className="badge-dot" />
+                          {user.status}
+                        </span>
+                      </td>
+                      <td>
+                        <span className={`role-badge ${user.role}`}>
+                          {user.role}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          <footer className="pagination">
+            <span>
+              Page {pagination.page} of {pagination.total_pages || 1}
+            </span>
+
+            <div className="pagination-buttons">
+              <button
+                onClick={() => setPage((current) => Math.max(1, current - 1))}
+                disabled={page === 1 || loading}
+              >
+                Previous
+              </button>
+              <button
+                onClick={() => setPage((current) => current + 1)}
+                disabled={!pagination.has_next_page || loading}
+              >
+                Next
+              </button>
+            </div>
+          </footer>
+        </section>
+      </section>
+    </main>
   );
 }
